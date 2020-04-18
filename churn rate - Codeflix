@@ -1,0 +1,67 @@
+WITH months AS
+(SELECT
+'2017-01-01' as first_day,
+'2017-01-31' as last_day
+UNION
+SELECT
+'2017-02-01' as first_day,
+'2017-02-28' as last_day
+UNION
+SELECT
+'2017-03-01' as first_day,
+'2017-03-31' as last_day
+),
+cross_join as (
+SELECT *
+FROM subscriptions
+  cross join
+  months
+  ),
+status as (
+select cross_join.id, cross_join.first_day AS Months,
+  CASE WHEN (subscription_start < first_day) 
+  AND(
+      subscription_end > first_day
+      OR subscription_end IS NULL
+      ) 
+  AND(segment = 30)
+  then 1
+  else 0
+  end as 'is_active_87',
+  CASE WHEN (subscription_start < first_day) 
+    AND (
+      subscription_end > first_day
+      OR subscription_end IS NULL
+      ) 
+   AND(segment = 30)
+  then 1
+  else 0
+   end as 'is_active_30',
+    CASE WHEN (
+      subscription_end BETWEEN first_day AND last_day 
+      ) 
+  AND(segment = 87)
+  then 1
+  else 0
+  end as 'is_canceled_87',
+    CASE WHEN (
+      subscription_end BETWEEN first_day AND last_day 
+      )  
+  AND(segment = 30)
+  then 1
+  else 0
+  end as 'is_canceled_30'
+  from cross_join 
+  ),
+status_aggregate as (
+  SELECT
+ID, MONTHS,SUM(status.is_active_87) AS 'sum_active_87',
+SUM(status.is_active_30) AS 'sum_active_30',
+SUM(status.is_canceled_87) AS 'sum_canceled_87',
+SUM(status.is_canceled_30)  AS 'sum_canceled_30'
+  FROM status
+  GROUP BY MONTHS
+  )
+select ID, MONTHS,1.0*sum_canceled_87/sum_active_87 AS activechurnrate,
+1.0*sum_canceled_30/sum_active_30 as active30 from status_aggregate 
+  ;
